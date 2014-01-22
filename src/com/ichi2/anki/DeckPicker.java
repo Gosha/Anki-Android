@@ -1282,7 +1282,16 @@ public class DeckPicker extends FragmentActivity {
         } else {
             // AnkiDroid is being updated and a collection already exists. Run a database check here since we could
             // have added database fixes in between releases.
-            if (!preferences.getString("lastUpgradeVersion", "").equals(AnkiDroidApp.getPkgVersion())) {
+            boolean sameVersion = true;
+
+            try {
+                sameVersion = preferences.getString("lastUpgradeVersion", "").equals(AnkiDroidApp.getPkgVersion());
+            } catch (Exception e) {
+                Log.w("AnkiDroid", "DeckPicker: lastUpgradeVersion doesn't seem to be a string.");
+                sameVersion = false;
+            }
+
+            if (!sameVersion) {
                 preferences.edit().putString("lastUpgradeVersion", AnkiDroidApp.getPkgVersion()).commit();
                 DeckTask.launchDeckTask(DeckTask.TASK_TYPE_OPEN_COLLECTION, new Listener() {
                     @Override
