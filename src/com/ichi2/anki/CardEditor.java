@@ -31,12 +31,15 @@ import android.content.res.Resources;
 import android.content.res.Resources.NotFoundException;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import java.io.File;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.Html;
 import android.text.method.KeyListener;
 import android.util.Log;
 import android.view.Gravity;
@@ -768,7 +771,7 @@ public class CardEditor extends Activity {
             return false;
         }
         for (int i = 0; i < mEditFields.size(); i++) {
-            if (mEditFields.get(i).getText().length() > 0) {
+            if (mEditFields.get(i).getContent().length() > 0) {
                 menu.findItem(MENU_COPY_CARD).setEnabled(true);
                 break;
             } else if (i == mEditFields.size() - 1) {
@@ -824,7 +827,7 @@ public class CardEditor extends Activity {
                         field.selectAll();
                     }
                     Lookup.lookUp(
-                            field.getText().toString().substring(field.getSelectionStart(), field.getSelectionEnd()));
+                            field.getContent().substring(field.getSelectionStart(), field.getSelectionEnd()));
                 }
                 return true;
 
@@ -1085,7 +1088,7 @@ public class CardEditor extends Activity {
                             int size = mEditFields.size();
                             String[] oldValues = new String[size];
                             for (int i = 0; i < size; i++) {
-                                oldValues[i] = mEditFields.get(i).getText().toString();
+                                oldValues[i] = mEditFields.get(i).getContent();
                             }
                             setNote();
                             resetEditFields(oldValues);
@@ -1382,7 +1385,7 @@ public class CardEditor extends Activity {
 
     private boolean duplicateCheck(boolean checkEmptyToo) {
         FieldEditText field = mEditFields.get(0);
-        if (mEditorNote.dupeOrEmpty(field.getText().toString()) > (checkEmptyToo ? 0 : 1)) {
+        if (mEditorNote.dupeOrEmpty(field.getContent()) > (checkEmptyToo ? 0 : 1)) {
             // TODO: theme backgrounds
             field.setBackgroundResource(R.drawable.white_edit_text_dupe);
             mSave.setEnabled(false);
@@ -1406,7 +1409,7 @@ public class CardEditor extends Activity {
     private String getFieldsText() {
         String[] fields = new String[mEditFields.size()];
         for (int i = 0; i < mEditFields.size(); i++) {
-            fields[i] = mEditFields.get(i).getText().toString();
+            fields[i] = mEditFields.get(i).getContent();
         }
         return Utils.joinFields(fields);
     }
@@ -1489,7 +1492,7 @@ public class CardEditor extends Activity {
             if (content == null) {
                 content = "";
             } else {
-                content = content.replaceAll("<br(\\s*\\/*)>", NEW_LINE);
+                //content = content.replaceAll("<br(\\s*\\/*)>", NEW_LINE);
             }
             if (mPrefFixArabic) {
                 this.setText(ArabicUtilities.reshapeSentence(content));
@@ -1516,6 +1519,7 @@ public class CardEditor extends Activity {
                     }
                 });
             }
+            Log.d("AnkiDroid", "new FieldEditText(): " + content);
         }
 
 
@@ -1527,9 +1531,10 @@ public class CardEditor extends Activity {
 
 
         public boolean updateField() {
-            String newValue = this.getText().toString().replace(NEW_LINE, "<br>");
+            String newValue = this.getContent();
             if (!mEditorNote.values()[mOrd].equals(newValue)) {
                 mEditorNote.values()[mOrd] = newValue;
+
                 return true;
             }
             return false;
@@ -1541,6 +1546,54 @@ public class CardEditor extends Activity {
             text = text.replaceAll("^[,;:\\s\\)\\]" + NEW_LINE + "]*", "");
             text = text.replaceAll("[,;:\\s\\(\\[" + NEW_LINE + "]*$", "");
             return text;
+        }
+
+        @Override
+        public void setText(CharSequence text, BufferType type) {
+            StringBuilder sb = new StringBuilder("\n");
+            StackTraceElement[] stackTraceElements = new Throwable().getStackTrace();
+            for(StackTraceElement s : stackTraceElements) {
+                sb.append(s.toString());
+                sb.append("\n");
+            }
+
+            StringBuilder sb2 = new StringBuilder();
+            for (Character c :text.toString().toCharArray()) {
+                sb2.append(c.charValue());
+                sb2.append(" ");
+            }
+
+            Log.d("AnkiDroid", "SetText(" + mName + "; "+ text.getClass() +"): " + text.toString()+ "["+sb2+"]");
+
+            if(text instanceof String) {
+                text = Html.fromHtml(text.toString(), new Html.ImageGetter() {
+                    @Override
+                    public Drawable getDrawable(String source) {
+                        String path = AnkiDroidApp.getCurrentAnkiDroidDirectory() + "/collection.media/" + source;
+                        if ((new File(path)).exists()) {
+                            Drawable d = Drawable.createFromPath(path);
+                            d.setBounds(0,0,d.getIntrinsicWidth(),d.getIntrinsicHeight());
+                            return d;
+                        } else {
+                            return null;
+                        }
+                    }
+                }, null);
+            }
+
+            super.setText(text, type);
+        }
+
+        public String getContent() {
+            String ret = Html.toHtml(this.getText()).replaceAll("^<p dir=\"...\">|</p>\n$", "");
+            StringBuilder sb = new StringBuilder();
+            for (Character c :ret.toCharArray()) {
+                sb.append(c.charValue());
+                sb.append(" ");
+            }
+            Log.d("AnkiDroid", "getContent(): " + ret + "["+sb+"] ("+ret.length()+")");
+
+            return ret;
         }
     }
 
